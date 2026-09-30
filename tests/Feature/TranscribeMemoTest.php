@@ -6,6 +6,7 @@ use App\Contracts\SpeechTranscriber;
 use App\Enums\MemoStatus;
 use App\Jobs\TranscribeMemo;
 use App\Models\Memo;
+use App\Services\OpenAiCompatibleTranscriber;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -86,5 +87,22 @@ class TranscribeMemoTest extends TestCase
         $memo->refresh();
         $this->assertSame(MemoStatus::Failed, $memo->status);
         $this->assertSame('provider down', $memo->error);
+    }
+
+    public function test_missing_key_explains_that_this_process_loaded_an_empty_value(): void
+    {
+        Storage::fake('memos');
+        config(['stt.api_key' => '']);
+
+        $memo = Memo::factory()->create([
+            'disk' => 'memos',
+            'disk_path' => 'stables/1/note.m4a',
+        ]);
+        Storage::disk('memos')->put($memo->disk_path, 'fake-audio');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('STT_API_KEY is empty in this process.');
+
+        app(OpenAiCompatibleTranscriber::class)->transcribe($memo);
     }
 }

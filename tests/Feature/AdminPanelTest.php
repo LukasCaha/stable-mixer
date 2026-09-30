@@ -2,15 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Enums\MemoStatus;
 use App\Enums\UserRole;
 use App\Filament\Auth\RegisterStable;
+use App\Filament\Resources\Memos\Pages\ViewMemo;
 use App\Filament\Resources\StableMates\Pages\CreateStableMate;
 use App\Models\Memo;
 use App\Models\Stable;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -188,7 +192,68 @@ class AdminPanelTest extends TestCase
             ->get('/admin/A1B2C3D4/memos/'.$memo->id)
             ->assertOk()
             ->assertSee('North paddock gate')
+            ->assertSee('API key: set, starts with test, 8 characters.')
+            ->assertSee('https://stt.test/v1/audio/transcriptions')
+            ->assertSee('Model: whisper-1')
             ->assertSee('<audio', false);
+    }
+
+    public function test_dashboard_reports_a_database_queue_with_no_worker(): void
+    {
+        config(['queue.default' => 'database']);
+
+        $stable = Stable::factory()->create(['tenant_code' => 'A1B2C3D4']);
+        $owner = User::factory()->for($stable)->owner()->create();
+
+        DB::table('jobs')->insert([
+            'queue' => 'default',
+            'payload' => '{}',
+            'attempts' => 0,
+            'reserved_at' => null,
+            'available_at' => now()->getTimestamp(),
+            'created_at' => now()->getTimestamp(),
+        ]);
+
+        $this->actingAs($owner)
+            ->get('/admin/A1B2C3D4')
+            ->assertOk()
+            ->assertSee('Queue: database. 1 ready, 0 in progress, 0 delayed, 0 in failed_jobs.')
+            ->assertSee('No queue worker is running.');
+    }
+
+    public function test_run_now_writes_the_transcript_on_the_memo(): void
+    {
+        Storage::fake('memos');
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://stt.test/v1/audio/transcriptions' => Http::response([
+                'text' => 'Turn out the mare.',
+            ]),
+        ]);
+
+        $stable = Stable::factory()->create(['tenant_code' => 'A1B2C3D4']);
+        $owner = User::factory()->for($stable)->owner()->create();
+        $memo = Memo::factory()->for($stable)->create([
+            'disk' => 'memos',
+            'disk_path' => 'stables/'.$stable->id.'/note.m4a',
+            'status' => MemoStatus::Failed,
+            'error' => 'STT_API_KEY is empty in this process.',
+        ]);
+        Storage::disk('memos')->put($memo->disk_path, 'fake-audio');
+
+        $this->actingAs($owner);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Filament::setTenant($stable);
+
+        Livewire::actingAs($owner)
+            ->test(ViewMemo::class, ['record' => $memo->getRouteKey()])
+            ->callAction('runNow')
+            ->assertNotified('Transcript saved');
+
+        $memo->refresh();
+        $this->assertSame(MemoStatus::Done, $memo->status);
+        $this->assertSame('Turn out the mare.', $memo->transcript);
+        $this->assertNull($memo->error);
     }
 
     public function test_audio_route_is_limited_to_the_stable(): void

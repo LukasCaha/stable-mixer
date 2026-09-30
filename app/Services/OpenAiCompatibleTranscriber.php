@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Contracts\SpeechTranscriber;
 use App\Models\Memo;
+use App\Support\SpeechDebug;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -14,8 +15,8 @@ class OpenAiCompatibleTranscriber implements SpeechTranscriber
     {
         $apiKey = config('stt.api_key');
 
-        if (! is_string($apiKey) || $apiKey === '') {
-            throw new RuntimeException('STT_API_KEY is not configured.');
+        if (! is_string($apiKey) || trim($apiKey) === '') {
+            throw new RuntimeException(SpeechDebug::missingKeyMessage());
         }
 
         $disk = Storage::disk($memo->disk);

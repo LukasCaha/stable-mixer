@@ -6,6 +6,10 @@ use App\Enums\MemoStatus;
 use App\Filament\Resources\Memos\Pages\ListMemos;
 use App\Filament\Resources\Memos\Pages\ViewMemo;
 use App\Models\Memo;
+use App\Support\SpeechDebug;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -13,6 +17,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Number;
@@ -55,6 +60,15 @@ class MemoResource extends Resource
                     ->placeholder('—')
                     ->visible(fn (Memo $record): bool => $record->status === MemoStatus::Failed)
                     ->columnSpanFull(),
+                TextEntry::make('speech_debug')
+                    ->label('Speech-to-text process')
+                    ->state(fn (): HtmlString => new HtmlString(
+                        collect(SpeechDebug::lines())
+                            ->map(fn (string $line): string => '<p>'.e($line).'</p>')
+                            ->implode('')
+                    ))
+                    ->html()
+                    ->columnSpanFull(),
             ]);
     }
 
@@ -73,6 +87,26 @@ class MemoResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('status')->options(MemoStatus::class),
+            ])
+            ->recordActions([
+                Action::make('queueTranscription')
+                    ->label('Queue again')
+                    ->icon(Heroicon::OutlinedArrowPath)
+                    ->visible(fn (Memo $record): bool => $record->status === MemoStatus::Failed)
+                    ->action(function (Memo $record): void {
+                        TranscribeMemoActions::queue($record);
+                    }),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    BulkAction::make('queueSelected')
+                        ->label('Queue transcription')
+                        ->icon(Heroicon::OutlinedArrowPath)
+                        ->action(function (Collection $records): void {
+                            TranscribeMemoActions::queueMany($records);
+                        })
+                        ->deselectRecordsAfterCompletion(),
+                ]),
             ]);
     }
 

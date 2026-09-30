@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Stables;
 
+use App\Filament\Forms\TenantCodeQrField;
 use App\Filament\Resources\Stables\Pages\EditStable;
 use App\Filament\Resources\Stables\Pages\ListStables;
 use App\Models\Stable;
@@ -39,6 +40,7 @@ class StableResource extends Resource
                     ->disabled()
                     ->dehydrated(false)
                     ->helperText('Read-only. Regenerate it from the page header if the companion app code leaks.'),
+                TenantCodeQrField::make(),
                 Toggle::make('is_active')->label('Accept companion uploads'),
             ]);
     }

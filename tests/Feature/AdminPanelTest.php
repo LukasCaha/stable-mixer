@@ -45,6 +45,7 @@ class AdminPanelTest extends TestCase
             ->assertOk()
             ->assertSee('Memos today')
             ->assertSee('North paddock gate')
+            ->assertSee('data:image/svg+xml;base64', false)
             ->assertDontSee('SECRET OTHER STABLE');
 
         $this->actingAs($owner)
@@ -58,7 +59,11 @@ class AdminPanelTest extends TestCase
         $owner = User::factory()->for($stable)->owner()->create();
         $member = User::factory()->for($stable)->create();
 
-        $this->actingAs($owner)->get('/admin/A1B2C3D4/profile')->assertOk();
+        $this->actingAs($owner)
+            ->get('/admin/A1B2C3D4/profile')
+            ->assertOk()
+            ->assertSee('data:image/svg+xml;base64', false)
+            ->assertSee('A1B2C3D4');
         $this->actingAs($member)->get('/admin/A1B2C3D4/profile')->assertNotFound();
     }
 

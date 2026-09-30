@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Forms\TenantCodeQrField;
 use App\Models\Stable;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -28,6 +29,7 @@ class EditStableProfile extends EditTenantProfile
                     ->disabled()
                     ->dehydrated(false)
                     ->helperText('Read-only after create. Regenerate only if the companion app code is compromised.'),
+                TenantCodeQrField::make(),
                 Toggle::make('is_active')->label('Accept companion uploads'),
             ]);
     }

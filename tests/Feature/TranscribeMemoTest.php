@@ -6,10 +6,11 @@ use App\Contracts\SpeechTranscriber;
 use App\Enums\MemoStatus;
 use App\Jobs\TranscribeMemo;
 use App\Models\Memo;
-use App\Services\OpenAiCompatibleTranscriber;
+use App\Services\GroqTranscriber;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Ai\Prompts\TranscriptionPrompt;
+use Laravel\Ai\Transcription;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -20,12 +21,7 @@ class TranscribeMemoTest extends TestCase
     public function test_job_stores_the_transcript(): void
     {
         Storage::fake('memos');
-        Http::preventStrayRequests();
-        Http::fake([
-            'https://stt.test/v1/audio/transcriptions' => Http::response([
-                'text' => 'Turn out the mare.',
-            ]),
-        ]);
+        Transcription::fake(['Turn out the mare.']);
 
         $memo = Memo::factory()->create([
             'disk' => 'memos',
@@ -41,9 +37,9 @@ class TranscribeMemoTest extends TestCase
         $this->assertSame('Turn out the mare.', $memo->transcript);
         $this->assertNull($memo->error);
 
-        Http::assertSent(function ($request): bool {
-            return $request->url() === 'https://stt.test/v1/audio/transcriptions'
-                && str_contains($request->body(), 'whisper-1');
+        Transcription::assertGenerated(function (TranscriptionPrompt $prompt): bool {
+            return $prompt->provider->driver() === 'groq'
+                && $prompt->model === 'whisper-large-v3-turbo';
         });
     }
 
@@ -92,7 +88,7 @@ class TranscribeMemoTest extends TestCase
     public function test_missing_key_explains_that_this_process_loaded_an_empty_value(): void
     {
         Storage::fake('memos');
-        config(['stt.api_key' => '']);
+        config(['stt.groq_key' => '']);
 
         $memo = Memo::factory()->create([
             'disk' => 'memos',
@@ -101,8 +97,8 @@ class TranscribeMemoTest extends TestCase
         Storage::disk('memos')->put($memo->disk_path, 'fake-audio');
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('STT_API_KEY is empty in this process.');
+        $this->expectExceptionMessage('GROQ_API_KEY is empty in this process.');
 
-        app(OpenAiCompatibleTranscriber::class)->transcribe($memo);
+        app(GroqTranscriber::class)->transcribe($memo);
     }
 }

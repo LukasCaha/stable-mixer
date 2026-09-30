@@ -10,7 +10,7 @@ The companion app is not authenticated. Anyone who knows an active stable’s pa
 - Filament 4, with each Filament team set to one `Stable`
 - Database queue (Redis works if you change `QUEUE_CONNECTION`)
 - Private `memos` disk (local by default, S3 if configured)
-- OpenAI-compatible Whisper endpoint (`STT_API_KEY`, `STT_BASE_URL`)
+- Groq speech-to-text through Laravel AI SDK (`GROQ_API_KEY`, `whisper-large-v3-turbo`)
 
 ## Requirements
 
@@ -47,15 +47,12 @@ composer dev
 
 `QUEUE_CONNECTION=database` is the default. Uploads stay `queued` until a worker runs `TranscribeMemo`.
 
-Set the speech-to-text provider in `.env`:
+Set the Groq key in `.env`. The same `gsk_` key you already have is the one Laravel AI SDK 1.0 uses. The model is `whisper-large-v3-turbo`.
 
 ```bash
-STT_API_KEY=sk-...
-STT_BASE_URL=https://api.openai.com/v1
-STT_MODEL=whisper-1
+GROQ_API_KEY=gsk_...
+STT_MODEL=whisper-large-v3-turbo
 ```
-
-`STT_BASE_URL` is any OpenAI-compatible root. The job POSTs `{STT_BASE_URL}/audio/transcriptions`.
 
 ## Companion upload
 

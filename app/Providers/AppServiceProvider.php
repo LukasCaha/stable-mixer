@@ -4,7 +4,7 @@ namespace App\Providers;
 
 use App\Console\Commands\ServeCommand;
 use App\Contracts\SpeechTranscriber;
-use App\Services\OpenAiCompatibleTranscriber;
+use App\Services\GroqTranscriber;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Console\ServeCommand as FrameworkServeCommand;
 use Illuminate\Http\Request;
@@ -15,7 +15,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(SpeechTranscriber::class, OpenAiCompatibleTranscriber::class);
+        $this->app->bind(SpeechTranscriber::class, GroqTranscriber::class);
         $this->app->singleton(FrameworkServeCommand::class, ServeCommand::class);
     }
 

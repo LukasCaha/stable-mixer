@@ -32,9 +32,8 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
-        <env name="STT_API_KEY" value="test-key"/>
-        <env name="STT_BASE_URL" value="https://stt.test/v1"/>
-        <env name="STT_MODEL" value="whisper-1"/>
+        <env name="GROQ_API_KEY" value="test-key"/>
+        <env name="STT_MODEL" value="whisper-large-v3-turbo"/>
         <env name="MEMO_DISK_DRIVER" value="local"/>
     </php>
 </phpunit>

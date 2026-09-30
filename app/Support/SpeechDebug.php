@@ -16,8 +16,7 @@ class SpeechDebug
     {
         $lines = [
             self::keyLine(),
-            'Endpoint: '.rtrim((string) config('stt.base_url'), '/').'/audio/transcriptions',
-            'Model: '.(string) config('stt.model').'. Timeout: '.(int) config('stt.timeout').'s.',
+            'Provider: groq. Model: '.(string) config('stt.model').'. Timeout: '.(int) config('stt.timeout').'s.',
             self::cacheLine(),
             self::queueLine(),
         ];
@@ -34,22 +33,22 @@ class SpeechDebug
     {
         $why = app()->configurationIsCached()
             ? 'Config is cached, so a key saved in .env is invisible until you run config:cache and restart the queue worker.'
-            : 'This process loaded an empty STT_API_KEY.';
+            : 'This process loaded an empty GROQ_API_KEY.';
 
-        return 'STT_API_KEY is empty in this process. '.$why;
+        return 'GROQ_API_KEY is empty in this process. '.$why;
     }
 
     private static function keyLine(): string
     {
-        $key = config('stt.api_key');
+        $key = config('stt.groq_key');
 
         if (! is_string($key) || trim($key) === '') {
-            return 'API key: empty in this process.';
+            return 'Groq key: empty in this process.';
         }
 
         $key = trim($key);
 
-        return 'API key: set, starts with '.substr($key, 0, 4).', '.strlen($key).' characters.';
+        return 'Groq key: set, starts with '.substr($key, 0, 4).', '.strlen($key).' characters.';
     }
 
     private static function cacheLine(): string

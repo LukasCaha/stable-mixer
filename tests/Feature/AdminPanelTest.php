@@ -14,8 +14,8 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Ai\Transcription;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -192,9 +192,8 @@ class AdminPanelTest extends TestCase
             ->get('/admin/A1B2C3D4/memos/'.$memo->id)
             ->assertOk()
             ->assertSee('North paddock gate')
-            ->assertSee('API key: set, starts with test, 8 characters.')
-            ->assertSee('https://stt.test/v1/audio/transcriptions')
-            ->assertSee('Model: whisper-1')
+            ->assertSee('Groq key: set, starts with test, 8 characters.')
+            ->assertSee('Provider: groq. Model: whisper-large-v3-turbo.')
             ->assertSee('<audio', false);
     }
 
@@ -224,12 +223,7 @@ class AdminPanelTest extends TestCase
     public function test_run_now_writes_the_transcript_on_the_memo(): void
     {
         Storage::fake('memos');
-        Http::preventStrayRequests();
-        Http::fake([
-            'https://stt.test/v1/audio/transcriptions' => Http::response([
-                'text' => 'Turn out the mare.',
-            ]),
-        ]);
+        Transcription::fake(['Turn out the mare.']);
 
         $stable = Stable::factory()->create(['tenant_code' => 'A1B2C3D4']);
         $owner = User::factory()->for($stable)->owner()->create();

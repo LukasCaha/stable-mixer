@@ -2,11 +2,10 @@
 
 return [
 
-    'api_key' => env('STT_API_KEY'),
+    // GROQ_API_KEY is the Laravel AI SDK name. STT_API_KEY still works if that one is unset.
+    'groq_key' => env('GROQ_API_KEY', env('STT_API_KEY')),
 
-    'base_url' => env('STT_BASE_URL', 'https://api.openai.com/v1'),
-
-    'model' => env('STT_MODEL', 'whisper-1'),
+    'model' => env('STT_MODEL', 'whisper-large-v3-turbo'),
 
     'timeout' => (int) env('STT_TIMEOUT', 120),
 

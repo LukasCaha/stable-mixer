@@ -130,4 +130,44 @@ class MemoApiTest extends TestCase
         $payload()->assertCreated();
         $payload()->assertTooManyRequests();
     }
+
+    public function test_active_stable_lookup_returns_the_name_and_code(): void
+    {
+        Stable::factory()->create([
+            'name' => 'North Barn',
+            'tenant_code' => 'A1B2C3D4',
+        ]);
+
+        $this->getJson('/api/v1/stables/a1b2c3d4')
+            ->assertOk()
+            ->assertExactJson([
+                'name' => 'North Barn',
+                'tenant_code' => 'A1B2C3D4',
+            ]);
+    }
+
+    public function test_unknown_and_inactive_stable_lookups_match(): void
+    {
+        Stable::factory()->inactive()->create([
+            'name' => 'Closed Barn',
+            'tenant_code' => 'DEADBEEF',
+        ]);
+
+        $unknown = $this->getJson('/api/v1/stables/NOPE1234');
+        $inactive = $this->getJson('/api/v1/stables/DEADBEEF');
+
+        $unknown->assertNotFound();
+        $inactive->assertNotFound();
+        $this->assertSame($unknown->json(), $inactive->json());
+        $this->assertArrayNotHasKey('name', $unknown->json());
+    }
+
+    public function test_stable_lookups_are_rate_limited_by_ip(): void
+    {
+        config(['stt.rate_limit_per_minute' => 2]);
+
+        $this->getJson('/api/v1/stables/NOPE1234')->assertNotFound();
+        $this->getJson('/api/v1/stables/NOPE1234')->assertNotFound();
+        $this->getJson('/api/v1/stables/NOPE1234')->assertTooManyRequests();
+    }
 }

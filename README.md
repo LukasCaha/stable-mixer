@@ -2,7 +2,7 @@
 
 Laravel admin and companion API for a horse-stable voice-memo product. A stable is a tenant. The native app uploads audio with that stable’s public tenant code. This app stores the file, queues speech-to-text, and lets stable mates review transcripts.
 
-v0 does **not** authenticate the companion app. Anyone who knows the tenant code can upload. User auth on the native app comes later. The Filament admin is a normal login, and each account belongs to exactly one stable.
+The companion app is not authenticated. Anyone who knows an active stable’s pairing code can upload. User auth on the native app comes later. The Filament admin is a normal login, and each account belongs to exactly one stable.
 
 ## Stack
 
@@ -92,11 +92,23 @@ curl -sS -X POST http://localhost:8000/api/v1/memos \
 
 Health check: `GET /api/v1/health` → `{"status":"ok"}`.
 
+The phone confirms a code before it connects:
+
+`GET /api/v1/stables/{code}`
+
+An active stable returns `{ "name": "North Barn", "tenant_code": "A1B2C3D4" }`. Unknown and inactive codes both return `404` with `{ "message": "Stable not found." }`. Lookups are rate-limited per IP (`MEMO_RATE_LIMIT`, default 30 per minute).
+
 Uploads are rate-limited per tenant code (`MEMO_RATE_LIMIT`, default 30 per minute). Unknown and inactive codes are rejected and still count toward the limit for that code.
 
 Memos move through `queued` → `processing` → `done`, or `failed` with `error` set. `TranscribeMemo` implements `App\Contracts\Failable`; its `failed()` hook writes the error onto the memo.
 
 Raise `upload_max_filesize` and `post_max_size` in PHP if you accept longer recordings than the default 2 MB.
+
+## Create a stable
+
+Open `/admin/register`, or use the sign-up link on the login page. The form asks for a name, email, password, and stable name. It creates that person as the owner of a new stable and signs them in.
+
+The dashboard shows the pairing code and its QR. Share that with the phone. Owners can still invite mates from Stable mates. Creating a stable from the Stables list stays off; that list is for super admins.
 
 ## Admin
 

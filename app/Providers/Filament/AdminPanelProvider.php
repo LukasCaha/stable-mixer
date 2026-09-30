@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Auth\RegisterStable;
 use App\Filament\Pages\EditStableProfile;
 use App\Models\Stable;
 use Filament\Http\Middleware\Authenticate;
@@ -28,6 +29,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+            ->registration(RegisterStable::class)
             ->brandName('Stable Mixer')
             ->colors([
                 'primary' => Color::Amber,

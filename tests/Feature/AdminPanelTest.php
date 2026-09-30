@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRole;
+use App\Filament\Auth\RegisterStable;
 use App\Filament\Resources\StableMates\Pages\CreateStableMate;
 use App\Models\Memo;
 use App\Models\Stable;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -24,7 +26,64 @@ class AdminPanelTest extends TestCase
 
     public function test_login_screen_is_available(): void
     {
-        $this->get('/admin/login')->assertOk();
+        $this->get('/admin/login')
+            ->assertOk()
+            ->assertSee('sign up for an account');
+    }
+
+    public function test_registration_creates_an_owner_and_a_stable(): void
+    {
+        Livewire::test(RegisterStable::class)
+            ->fillForm([
+                'name' => 'Ada Owner',
+                'email' => 'ada@stable.test',
+                'stable_name' => 'North Barn',
+                'password' => 'password',
+                'passwordConfirmation' => 'password',
+            ])
+            ->call('register')
+            ->assertHasNoFormErrors();
+
+        $user = User::query()->where('email', 'ada@stable.test')->first();
+        $this->assertNotNull($user);
+        $this->assertFalse($user->is_super_admin);
+        $this->assertSame(UserRole::Owner, $user->role);
+        $this->assertTrue(Hash::check('password', $user->password));
+        $this->assertAuthenticatedAs($user);
+
+        $stable = $user->stable;
+        $this->assertNotNull($stable);
+        $this->assertSame('North Barn', $stable->name);
+        $this->assertTrue($stable->is_active);
+        $this->assertMatchesRegularExpression('/^[A-Z0-9]{8}$/', $stable->tenant_code);
+        $this->assertSame(1, Stable::query()->count());
+        $this->assertSame(1, User::query()->count());
+
+        $this->get('/admin/'.$stable->tenant_code)
+            ->assertOk()
+            ->assertSee('North Barn')
+            ->assertSee($stable->tenant_code);
+    }
+
+    public function test_registration_rejects_a_duplicate_email(): void
+    {
+        $stable = Stable::factory()->create();
+        User::factory()->for($stable)->create(['email' => 'ada@stable.test']);
+
+        Livewire::test(RegisterStable::class)
+            ->fillForm([
+                'name' => 'Ada Owner',
+                'email' => 'ada@stable.test',
+                'stable_name' => 'North Barn',
+                'password' => 'password',
+                'passwordConfirmation' => 'password',
+            ])
+            ->call('register')
+            ->assertHasFormErrors(['email']);
+
+        $this->assertSame(1, Stable::query()->count());
+        $this->assertSame(1, User::query()->count());
+        $this->assertGuest();
     }
 
     public function test_owner_dashboard_is_scoped_to_their_stable(): void

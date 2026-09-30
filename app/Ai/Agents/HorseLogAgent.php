@@ -21,10 +21,13 @@ class HorseLogAgent implements Agent, HasProviderOptions, HasStructuredOutput
 {
     use Promptable;
 
+    public string $language = 'en';
+
     public function instructions(): string
     {
         return <<<'TEXT'
 You keep a knowledge document and an event log for a farm.
+Write knowledge, summaries, and details in the stable language named in the prompt.
 A transcript may mention animals, vehicles, tools, feed, tack, and repairs.
 Return one record for each thing it affects. One transcript may update several records.
 Use an existing roster name when it is the same thing, ignoring case and aliases.

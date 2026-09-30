@@ -143,6 +143,7 @@ class MemoApiTest extends TestCase
             ->assertExactJson([
                 'name' => 'North Barn',
                 'tenant_code' => 'A1B2C3D4',
+                'language' => 'en',
             ]);
     }
 

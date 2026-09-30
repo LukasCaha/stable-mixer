@@ -23,6 +23,7 @@ class StableController extends Controller
         return response()->json([
             'name' => $stable->name,
             'tenant_code' => $stable->tenant_code,
+            'language' => $stable->language?->value ?? 'en',
         ]);
     }
 

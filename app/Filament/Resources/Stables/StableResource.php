@@ -2,11 +2,13 @@
 
 namespace App\Filament\Resources\Stables;
 
+use App\Enums\StableLanguage;
 use App\Filament\Forms\TenantCodeQrField;
 use App\Filament\Resources\Stables\Pages\EditStable;
 use App\Filament\Resources\Stables\Pages\ListStables;
 use App\Models\Stable;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
@@ -35,6 +37,9 @@ class StableResource extends Resource
         return $schema
             ->components([
                 TextInput::make('name')->required()->maxLength(255),
+                Select::make('language')
+                    ->options(StableLanguage::class)
+                    ->required(),
                 TextInput::make('tenant_code')
                     ->label('Tenant code')
                     ->disabled()
@@ -51,6 +56,7 @@ class StableResource extends Resource
             ->defaultSort('name')
             ->columns([
                 TextColumn::make('name')->searchable()->sortable(),
+                TextColumn::make('language')->badge()->sortable(),
                 TextColumn::make('tenant_code')->label('Tenant code')->searchable()->copyable(),
                 IconColumn::make('is_active')->label('Active')->boolean(),
                 TextColumn::make('users_count')->counts('users')->label('Mates'),

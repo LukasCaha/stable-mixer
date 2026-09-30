@@ -75,7 +75,9 @@ class HorseLogWriter
             'log_error' => null,
         ]);
 
-        $response = HorseLogAgent::make()->prompt($this->prompt($memo, $transcript));
+        $agent = HorseLogAgent::make();
+        $agent->language = $memo->stable->language?->value ?? 'en';
+        $response = $agent->prompt($this->prompt($memo, $transcript));
         $records = $response['records'] ?? $response['horses'] ?? null;
 
         if (! is_array($records)) {
@@ -152,7 +154,10 @@ class HorseLogWriter
 
         $recordedAt = $memo->recorded_at?->toIso8601String() ?? 'unknown';
 
+        $language = $memo->stable->language?->promptName() ?? 'English';
+
         return <<<TEXT
+Stable language: {$language}
 Recorded at: {$recordedAt}
 
 Roster:

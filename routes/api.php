@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AnswerController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\MemoController;
+use App\Http\Controllers\Api\V1\RecordController;
 use App\Http\Controllers\Api\V1\StableController;
 use Illuminate\Support\Facades\Route;
 
@@ -16,4 +17,5 @@ Route::prefix('v1')->group(function () {
     Route::get('/stables/{code}', [StableController::class, 'show'])->middleware('throttle:stables');
     Route::post('/memos', [MemoController::class, 'store'])->middleware('throttle:memos');
     Route::get('/answers', [AnswerController::class, 'index'])->middleware('throttle:memos');
+    Route::get('/records', [RecordController::class, 'index'])->middleware('throttle:memos');
 });

@@ -34,7 +34,10 @@ class GroqTranscriber implements SpeechTranscriber
         $audio = (new StoredAudio($memo->disk_path, $memo->disk))
             ->withMimeType((string) $memo->mime);
 
+        $language = $memo->stable?->language?->value ?? 'en';
+
         $text = (string) Transcription::of($audio)
+            ->language($language)
             ->timeout((int) config('stt.timeout'))
             ->generate('groq', (string) config('stt.model'));
 

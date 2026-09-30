@@ -2,10 +2,12 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\StableLanguage;
 use App\Filament\Forms\TenantCodeQrField;
 use App\Models\Stable;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
@@ -24,6 +26,11 @@ class EditStableProfile extends EditTenantProfile
         return $schema
             ->components([
                 TextInput::make('name')->required()->maxLength(255),
+                Select::make('language')
+                    ->label('Language')
+                    ->options(StableLanguage::class)
+                    ->required()
+                    ->helperText('Transcription and answers for this stable use this language. The phone has its own language setting.'),
                 TextInput::make('tenant_code')
                     ->label('Tenant code')
                     ->disabled()

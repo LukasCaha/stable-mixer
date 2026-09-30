@@ -16,6 +16,11 @@ class QuestionAnswerer
 {
     public const Unknown = 'The records do not say.';
 
+    public static function unknown(string $language): string
+    {
+        return $language === 'cs' ? 'V záznamech to není.' : self::Unknown;
+    }
+
     public function answer(Memo $memo): void
     {
         try {
@@ -41,7 +46,9 @@ class QuestionAnswerer
             },
         ]);
 
-        $response = QuestionAgent::make()->prompt($this->prompt($memo, $transcript));
+        $agent = QuestionAgent::make();
+        $agent->language = $memo->stable->language?->value ?? 'en';
+        $response = $agent->prompt($this->prompt($memo, $transcript));
         $questions = $response['questions'] ?? null;
 
         if (! is_array($questions)) {
@@ -92,7 +99,11 @@ class QuestionAnswerer
             $roster = 'No records yet.';
         }
 
+        $language = $memo->stable->language?->promptName() ?? 'English';
+
         return <<<TEXT
+Stable language: {$language}
+
 Roster:
 {$roster}
 

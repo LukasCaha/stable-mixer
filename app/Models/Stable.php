@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\StableLanguage;
 use Database\Factories\StableFactory;
 use Filament\Models\Contracts\HasName;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,10 +17,18 @@ class Stable extends Model implements HasName
     use HasFactory;
 
     /**
+     * @var array<string, string>
+     */
+    protected $attributes = [
+        'language' => 'en',
+    ];
+
+    /**
      * @var list<string>
      */
     protected $fillable = [
         'name',
+        'language',
         'tenant_code',
         'is_active',
     ];
@@ -31,6 +40,7 @@ class Stable extends Model implements HasName
     {
         return [
             'is_active' => 'boolean',
+            'language' => StableLanguage::class,
         ];
     }
 

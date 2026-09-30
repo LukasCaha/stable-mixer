@@ -7,6 +7,7 @@ use App\Filament\Resources\Memos\MemoResource;
 use App\Filament\Resources\Memos\TranscribeMemoActions;
 use App\Models\Memo;
 use App\Services\HorseLogWriter;
+use App\Services\QuestionAnswerer;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
@@ -47,7 +48,8 @@ class ViewMemo extends ViewRecord
                     /** @var Memo $memo */
                     $memo = $this->getRecord();
                     app(HorseLogWriter::class)->record($memo);
-                    $memo->refresh()->load('horseEvents.horse');
+                    app(QuestionAnswerer::class)->answer($memo->refresh());
+                    $memo->refresh()->load(['horseEvents.horse', 'answers']);
                     $this->fillForm();
 
                     $notification = Notification::make();

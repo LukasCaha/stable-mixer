@@ -52,6 +52,11 @@ class Memo extends Model
         return $this->belongsTo(Stable::class);
     }
 
+    public function answers(): HasMany
+    {
+        return $this->hasMany(Answer::class)->latest();
+    }
+
     public function horseEvents(): HasMany
     {
         return $this->hasMany(HorseEvent::class)

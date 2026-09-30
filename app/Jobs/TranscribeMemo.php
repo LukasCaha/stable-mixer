@@ -8,6 +8,7 @@ use App\Enums\HorseLogStatus;
 use App\Enums\MemoStatus;
 use App\Models\Memo;
 use App\Services\HorseLogWriter;
+use App\Services\QuestionAnswerer;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
@@ -50,6 +51,8 @@ class TranscribeMemo implements Failable, ShouldQueue
                 'log_error' => str($exception->getMessage() ?: 'Horse log failed.')->limit(2000)->toString(),
             ]);
         }
+
+        app(QuestionAnswerer::class)->answer($this->memo->refresh());
     }
 
     public function failed(?Throwable $exception): void

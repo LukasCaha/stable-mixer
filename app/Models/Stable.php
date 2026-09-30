@@ -59,6 +59,11 @@ class Stable extends Model implements HasName
         return $this->hasMany(Memo::class);
     }
 
+    public function answers(): HasMany
+    {
+        return $this->hasMany(Answer::class)->latest();
+    }
+
     public function horses(): HasMany
     {
         return $this->hasMany(Horse::class)->orderBy('name');

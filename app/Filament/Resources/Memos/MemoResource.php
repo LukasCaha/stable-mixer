@@ -66,6 +66,15 @@ class MemoResource extends Resource
                     ->placeholder('—')
                     ->visible(fn (Memo $record): bool => $record->log_status === HorseLogStatus::Failed)
                     ->columnSpanFull(),
+                RepeatableEntry::make('answers')
+                    ->label('Questions')
+                    ->placeholder('No questions in this memo.')
+                    ->contained()
+                    ->columnSpanFull()
+                    ->components([
+                        TextEntry::make('question')->columnSpanFull(),
+                        TextEntry::make('answer')->columnSpanFull(),
+                    ]),
                 RepeatableEntry::make('horseEvents')
                     ->label('Farm events')
                     ->placeholder('Nothing on the farm was mentioned.')

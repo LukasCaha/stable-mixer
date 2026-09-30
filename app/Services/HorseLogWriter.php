@@ -7,6 +7,7 @@ use App\Enums\HorseLogStatus;
 use App\Models\Horse;
 use App\Models\HorseEvent;
 use App\Models\Memo;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -21,9 +22,29 @@ class HorseLogWriter
         } catch (Throwable $exception) {
             $memo->update([
                 'log_status' => HorseLogStatus::Failed,
-                'log_error' => str($exception->getMessage() ?: 'Horse log failed.')->limit(2000)->toString(),
+                'log_error' => str($this->failureMessage($exception))->limit(2000)->toString(),
             ]);
         }
+    }
+
+    private function failureMessage(Throwable $exception): string
+    {
+        if ($exception instanceof RequestException) {
+            $error = $exception->response->json('error');
+
+            if (is_array($error)) {
+                $parts = array_values(array_filter([
+                    is_string($error['message'] ?? null) ? $error['message'] : null,
+                    is_string($error['failed_generation'] ?? null) ? $error['failed_generation'] : null,
+                ]));
+
+                if ($parts !== []) {
+                    return implode("\n\n", $parts);
+                }
+            }
+        }
+
+        return $exception->getMessage() ?: 'Horse log failed.';
     }
 
     private function interpret(Memo $memo): void

@@ -16,7 +16,10 @@ use App\Models\User;
 use App\Services\HorseLogWriter;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\JsonSchema\JsonSchemaTypeFactory;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Ai\Attributes\Strict;
+use Laravel\Ai\ObjectSchema;
 use Laravel\Ai\Prompts\AgentPrompt;
 use Laravel\Ai\Transcription;
 use Livewire\Livewire;
@@ -364,5 +367,17 @@ class HorseLogTest extends TestCase
             ->assertSee('Oak is sound. The lameness note was a mistake.')
             ->assertSee('Corrected')
             ->assertSee('Not lame');
+    }
+
+    public function test_the_horse_log_schema_is_strict_for_groq(): void
+    {
+        $agent = new HorseLogAgent;
+        $schema = (new ObjectSchema($agent->schema(new JsonSchemaTypeFactory), strict: true))->toSchema();
+        $occurredOn = $schema['properties']['horses']['items']['properties']['events']['items']['properties']['occurred_on'];
+
+        $this->assertTrue(Strict::isAppliedTo($agent));
+        $this->assertSame('string', $occurredOn['type']);
+        $this->assertFalse($schema['properties']['horses']['items']['additionalProperties']);
+        $this->assertSame(['reasoning_effort' => 'low'], $agent->providerOptions('groq'));
     }
 }

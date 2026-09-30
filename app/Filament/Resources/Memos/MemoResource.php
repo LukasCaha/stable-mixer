@@ -61,14 +61,14 @@ class MemoResource extends Resource
                 TextEntry::make('transcript')
                     ->placeholder('Not transcribed yet.')
                     ->columnSpanFull(),
-                TextEntry::make('log_status')->badge()->label('Horse log'),
+                TextEntry::make('log_status')->badge()->label('Farm log'),
                 TextEntry::make('log_error')
                     ->placeholder('—')
                     ->visible(fn (Memo $record): bool => $record->log_status === HorseLogStatus::Failed)
                     ->columnSpanFull(),
                 RepeatableEntry::make('horseEvents')
-                    ->label('Horse events')
-                    ->placeholder('No horses mentioned.')
+                    ->label('Farm events')
+                    ->placeholder('Nothing on the farm was mentioned.')
                     ->contained()
                     ->columnSpanFull()
                     ->components([
@@ -108,7 +108,7 @@ class MemoResource extends Resource
             ->columns([
                 TextColumn::make('created_at')->dateTime()->label('Uploaded')->sortable(),
                 TextColumn::make('status')->badge()->sortable(),
-                TextColumn::make('log_status')->badge()->label('Horse log')->sortable(),
+                TextColumn::make('log_status')->badge()->label('Farm log')->sortable(),
                 TextColumn::make('size')
                     ->formatStateUsing(fn (int $state): string => Number::fileSize($state)),
                 TextColumn::make('transcript')->limit(60)->placeholder('—')->searchable(),

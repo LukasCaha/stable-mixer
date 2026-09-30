@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\SubjectKind;
 use App\Models\Horse;
 use App\Models\Stable;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -23,6 +24,7 @@ class HorseFactory extends Factory
             'name' => fake()->firstName(),
             'aliases' => [],
             'knowledge' => '',
+            'kind' => SubjectKind::Animal,
         ];
     }
 }

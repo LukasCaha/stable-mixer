@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Ai\Agents\HorseLogAgent;
 use App\Enums\HorseLogStatus;
+use App\Enums\SubjectKind;
 use App\Models\Horse;
 use App\Models\HorseEvent;
 use App\Models\Memo;
+use App\Support\RecordScope;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +46,7 @@ class HorseLogWriter
             }
         }
 
-        return $exception->getMessage() ?: 'Horse log failed.';
+        return $exception->getMessage() ?: 'Farm log failed.';
     }
 
     private function interpret(Memo $memo): void
@@ -74,13 +76,13 @@ class HorseLogWriter
         ]);
 
         $response = HorseLogAgent::make()->prompt($this->prompt($memo, $transcript));
-        $horses = $response['horses'] ?? null;
+        $records = $response['records'] ?? $response['horses'] ?? null;
 
-        if (! is_array($horses)) {
-            throw new RuntimeException('Horse log response did not include a horses list.');
+        if (! is_array($records)) {
+            throw new RuntimeException('Farm log response did not include a records list.');
         }
 
-        $this->apply($memo, $horses);
+        $this->apply($memo, $records);
     }
 
     /**
@@ -138,12 +140,14 @@ class HorseLogWriter
                     $events = '  none';
                 }
 
-                return "- {$horse->name} (aliases: {$aliases})\n  Knowledge:\n{$knowledge}\n  Events:\n{$events}";
+                $kind = $horse->kind?->value ?? SubjectKind::Animal->value;
+
+                return "- {$horse->name} [{$kind}] (aliases: {$aliases})\n  Knowledge:\n{$knowledge}\n  Events:\n{$events}";
             })
             ->implode("\n");
 
         if ($roster === '') {
-            $roster = 'No horses yet.';
+            $roster = 'No records yet.';
         }
 
         $recordedAt = $memo->recorded_at?->toIso8601String() ?? 'unknown';
@@ -161,7 +165,7 @@ TEXT;
 
     /**
      * @param  list<mixed>  $horses
-     * @return list<array{name: string, name_key: string, aliases: list<string>, knowledge: string, retract_event_ids: list<int>, events: list<array{occurred_on: ?string, summary: string, detail: string}>}>
+     * @return list<array{name: string, name_key: string, kind: SubjectKind, aliases: list<string>, knowledge: string, retract_event_ids: list<int>, events: list<array{occurred_on: ?string, summary: string, detail: string}>}>
      */
     private function normalize(array $horses): array
     {
@@ -178,6 +182,8 @@ TEXT;
                 continue;
             }
 
+            $kind = is_string($horse['kind'] ?? null) ? $horse['kind'] : SubjectKind::Animal->value;
+            [$kind, $name] = RecordScope::resolve($kind, $name);
             $name = str($name)->limit(255, '')->toString();
             $key = mb_strtolower($name);
 
@@ -185,6 +191,7 @@ TEXT;
                 $grouped[$key] = [
                     'name' => $name,
                     'name_key' => $key,
+                    'kind' => $kind,
                     'aliases' => [],
                     'knowledge' => '',
                     'retract_event_ids' => [],
@@ -211,7 +218,7 @@ TEXT;
     }
 
     /**
-     * @param  array{name: string, name_key: string, aliases: list<string>, knowledge: string, retract_event_ids: list<int>, events: list<array{occurred_on: ?string, summary: string, detail: string}>}  $entry
+     * @param  array{name: string, name_key: string, kind: SubjectKind, aliases: list<string>, knowledge: string, retract_event_ids: list<int>, events: list<array{occurred_on: ?string, summary: string, detail: string}>}  $entry
      */
     private function upsertHorse(Memo $memo, array $entry): Horse
     {
@@ -224,6 +231,7 @@ TEXT;
             $horse = new Horse([
                 'stable_id' => $memo->stable_id,
                 'name' => $entry['name'],
+                'kind' => $entry['kind'],
             ]);
         }
 

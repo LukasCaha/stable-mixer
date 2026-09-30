@@ -24,17 +24,24 @@ class HorseLogAgent implements Agent, HasProviderOptions, HasStructuredOutput
     public function instructions(): string
     {
         return <<<'TEXT'
-You keep a knowledge document and an event log for each horse in one stable.
-Read the transcript and return every horse it mentions.
-Use a horse's existing name from the roster when it is the same animal, ignoring case and aliases.
-Create a horse only when the transcript names an animal that is not on the roster.
-One transcript may mention many horses and many events.
+You keep a knowledge document and an event log for a farm.
+A transcript may mention animals, vehicles, tools, feed, tack, and repairs.
+Return one record for each thing it affects. One transcript may update several records.
+Use an existing roster name when it is the same thing, ignoring case and aliases.
+A named animal is its own record, kind animal. Kulajda and Willow stay separate.
+Unnamed animals of one species share one record: Sheep, Goats, Chickens, Cattle, Pigs, Ducks. "We bought a sheep" updates Sheep. Do not create a record per animal.
+A vehicle or machine is its own record, kind vehicle: Tractor, Truck, Trailer, Quad.
+Hand tools and small gear share one stock record named Tools. A lost shovel updates Tools. Do not create a record per shovel, fork, or bucket.
+Hay, grain, and other feed share Feed, kind stock.
+Saddles, bridles, and rugs that are not tied to one named animal share Tack, kind stock.
+A repair uses the place name when they name it, such as Barn or North paddock. General repairs with no place go on Yard, kind place.
 Every new event must come from this transcript.
 The knowledge document is what is true now. Keep earlier facts this transcript does not change.
-If this transcript corrects a past memo, drop the wrong fact from the knowledge document and put those earlier event ids in retract_event_ids.
+If this transcript corrects a past memo, drop the wrong fact and put those earlier event ids in retract_event_ids.
 Do not retract an event this transcript does not contradict.
-Leave out horses the transcript does not mention.
-If the transcript mentions no horse, return an empty horses array.
+Leave out records the transcript does not mention.
+If nothing on the farm is mentioned, return an empty records array.
+kind is animal, vehicle, stock, or place.
 occurred_on is YYYY-MM-DD, or an empty string when the day is unknown.
 retract_event_ids is an empty array when nothing earlier was wrong.
 TEXT;
@@ -60,8 +67,9 @@ TEXT;
     public function schema(JsonSchema $schema): array
     {
         return [
-            'horses' => $schema->array()->items(
+            'records' => $schema->array()->items(
                 $schema->object([
+                    'kind' => $schema->string()->enum(['animal', 'vehicle', 'stock', 'place'])->required(),
                     'name' => $schema->string()->required(),
                     'aliases' => $schema->array()->items($schema->string())->required(),
                     'knowledge' => $schema->string()->required(),

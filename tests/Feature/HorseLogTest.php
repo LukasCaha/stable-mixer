@@ -6,6 +6,7 @@ use App\Ai\Agents\HorseLogAgent;
 use App\Contracts\SpeechTranscriber;
 use App\Enums\HorseLogStatus;
 use App\Enums\MemoStatus;
+use App\Enums\SubjectKind;
 use App\Filament\Resources\Memos\Pages\ViewMemo;
 use App\Jobs\TranscribeMemo;
 use App\Models\Horse;
@@ -235,13 +236,13 @@ class HorseLogTest extends TestCase
         ]);
 
         $this->actingAs($owner)
-            ->get('/admin/A1B2C3D4/horses')
+            ->get('/admin/A1B2C3D4/records')
             ->assertOk()
             ->assertSee('Willow')
             ->assertDontSee('Secret Horse');
 
         $this->actingAs($owner)
-            ->get('/admin/A1B2C3D4/horses/'.$horse->id)
+            ->get('/admin/A1B2C3D4/records/'.$horse->id)
             ->assertOk()
             ->assertSee('Willow is a grey mare.')
             ->assertSee('Turned out')
@@ -277,7 +278,7 @@ class HorseLogTest extends TestCase
         Livewire::actingAs($owner)
             ->test(ViewMemo::class, ['record' => $memo->getRouteKey()])
             ->callAction('rebuildHorseLog')
-            ->assertNotified('Horse log saved');
+            ->assertNotified('Farm log saved');
 
         $horse->refresh();
         $this->assertSame('Willow was turned out after lunch.', $horse->knowledge);
@@ -362,22 +363,137 @@ class HorseLogTest extends TestCase
         $this->assertSame('Not lame', $oak->events()->whereNull('retracted_at')->first()->summary);
 
         $this->actingAs($owner)
-            ->get('/admin/A1B2C3D4/horses/'.$oak->id)
+            ->get('/admin/A1B2C3D4/records/'.$oak->id)
             ->assertOk()
             ->assertSee('Oak is sound. The lameness note was a mistake.')
             ->assertSee('Corrected')
             ->assertSee('Not lame');
     }
 
+    public function test_a_farm_memo_groups_sheep_a_tractor_and_tools(): void
+    {
+        HorseLogAgent::fake([[
+            'records' => [
+                [
+                    'kind' => 'animal',
+                    'name' => 'a sheep',
+                    'aliases' => [],
+                    'knowledge' => 'The flock gained one sheep.',
+                    'retract_event_ids' => [],
+                    'events' => [
+                        [
+                            'occurred_on' => '2026-09-30',
+                            'summary' => 'Bought a sheep',
+                            'detail' => 'Added to the flock.',
+                        ],
+                    ],
+                ],
+                [
+                    'kind' => 'vehicle',
+                    'name' => 'the tractor',
+                    'aliases' => [],
+                    'knowledge' => 'The tractor is broken.',
+                    'retract_event_ids' => [],
+                    'events' => [
+                        [
+                            'occurred_on' => '2026-09-30',
+                            'summary' => 'Broken',
+                            'detail' => 'Will not start.',
+                        ],
+                    ],
+                ],
+                [
+                    'kind' => 'stock',
+                    'name' => 'shovel',
+                    'aliases' => [],
+                    'knowledge' => 'The shovel is missing.',
+                    'retract_event_ids' => [],
+                    'events' => [
+                        [
+                            'occurred_on' => '2026-09-30',
+                            'summary' => 'Lost the shovel',
+                            'detail' => 'Last seen by the barn.',
+                        ],
+                    ],
+                ],
+                [
+                    'kind' => 'animal',
+                    'name' => 'Willow',
+                    'aliases' => [],
+                    'knowledge' => 'Willow was turned out.',
+                    'retract_event_ids' => [],
+                    'events' => [
+                        [
+                            'occurred_on' => '2026-09-30',
+                            'summary' => 'Turned out',
+                            'detail' => 'North paddock.',
+                        ],
+                    ],
+                ],
+            ],
+        ]]);
+
+        $memo = Memo::factory()->done()->create([
+            'transcript' => 'We bought a sheep. The tractor is broken. I lost the shovel. Willow went out.',
+        ]);
+
+        app(HorseLogWriter::class)->record($memo);
+
+        $this->assertSame(4, Horse::query()->count());
+
+        $sheep = Horse::query()->where('name', 'Sheep')->firstOrFail();
+        $tractor = Horse::query()->where('name', 'Tractor')->firstOrFail();
+        $tools = Horse::query()->where('name', 'Tools')->firstOrFail();
+        $willow = Horse::query()->where('name', 'Willow')->firstOrFail();
+
+        $this->assertSame(SubjectKind::Animal, $sheep->kind);
+        $this->assertSame(SubjectKind::Vehicle, $tractor->kind);
+        $this->assertSame(SubjectKind::Stock, $tools->kind);
+        $this->assertSame(SubjectKind::Animal, $willow->kind);
+        $this->assertSame('Bought a sheep', $sheep->events()->first()->summary);
+        $this->assertSame('Broken', $tractor->events()->first()->summary);
+        $this->assertSame('Lost the shovel', $tools->events()->first()->summary);
+
+        HorseLogAgent::fake([[
+            'records' => [
+                [
+                    'kind' => 'stock',
+                    'name' => 'pitchfork',
+                    'aliases' => [],
+                    'knowledge' => 'The pitchfork is in the shed. The shovel is still missing.',
+                    'retract_event_ids' => [],
+                    'events' => [
+                        [
+                            'occurred_on' => '2026-09-30',
+                            'summary' => 'Found the pitchfork',
+                            'detail' => 'In the shed.',
+                        ],
+                    ],
+                ],
+            ],
+        ]]);
+
+        $later = Memo::factory()->for($memo->stable)->done()->create([
+            'transcript' => 'The pitchfork is in the shed.',
+        ]);
+        app(HorseLogWriter::class)->record($later);
+
+        $this->assertSame(1, Horse::query()->where('kind', SubjectKind::Stock)->count());
+        $tools->refresh();
+        $this->assertSame(2, $tools->events()->count());
+        $this->assertSame('The pitchfork is in the shed. The shovel is still missing.', $tools->knowledge);
+    }
+
     public function test_the_horse_log_schema_is_strict_for_groq(): void
     {
         $agent = new HorseLogAgent;
         $schema = (new ObjectSchema($agent->schema(new JsonSchemaTypeFactory), strict: true))->toSchema();
-        $occurredOn = $schema['properties']['horses']['items']['properties']['events']['items']['properties']['occurred_on'];
+        $occurredOn = $schema['properties']['records']['items']['properties']['events']['items']['properties']['occurred_on'];
 
         $this->assertTrue(Strict::isAppliedTo($agent));
         $this->assertSame('string', $occurredOn['type']);
-        $this->assertFalse($schema['properties']['horses']['items']['additionalProperties']);
+        $this->assertSame(['animal', 'vehicle', 'stock', 'place'], $schema['properties']['records']['items']['properties']['kind']['enum']);
+        $this->assertFalse($schema['properties']['records']['items']['additionalProperties']);
         $this->assertSame(['reasoning_effort' => 'low'], $agent->providerOptions('groq'));
     }
 }

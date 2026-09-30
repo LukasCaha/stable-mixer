@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\SubjectKind;
 use Database\Factories\HorseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +23,7 @@ class Horse extends Model
         'name_key',
         'aliases',
         'knowledge',
+        'kind',
     ];
 
     /**
@@ -31,6 +33,7 @@ class Horse extends Model
     {
         return [
             'aliases' => 'array',
+            'kind' => SubjectKind::class,
         ];
     }
 

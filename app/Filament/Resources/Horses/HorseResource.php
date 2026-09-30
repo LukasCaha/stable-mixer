@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Horses;
 
+use App\Enums\SubjectKind;
 use App\Filament\Resources\Horses\Pages\ListHorses;
 use App\Filament\Resources\Horses\Pages\ViewHorse;
 use App\Filament\Resources\Memos\MemoResource;
@@ -13,6 +14,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -20,9 +22,15 @@ class HorseResource extends Resource
 {
     protected static ?string $model = Horse::class;
 
+    protected static ?string $slug = 'records';
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBookOpen;
 
-    protected static ?string $navigationLabel = 'Horses';
+    protected static ?string $navigationLabel = 'Records';
+
+    protected static ?string $modelLabel = 'record';
+
+    protected static ?string $pluralModelLabel = 'records';
 
     protected static ?int $navigationSort = 2;
 
@@ -32,6 +40,7 @@ class HorseResource extends Resource
     {
         return $schema
             ->components([
+                TextEntry::make('kind')->badge(),
                 TextEntry::make('name'),
                 TextEntry::make('aliases')
                     ->state(fn (Horse $record): string => $record->aliases === []
@@ -70,8 +79,12 @@ class HorseResource extends Resource
             ->defaultSort('name')
             ->columns([
                 TextColumn::make('name')->searchable()->sortable(),
+                TextColumn::make('kind')->badge()->sortable(),
                 TextColumn::make('events_count')->label('Events')->sortable(),
                 TextColumn::make('updated_at')->dateTime()->label('Updated')->sortable(),
+            ])
+            ->filters([
+                SelectFilter::make('kind')->options(SubjectKind::class),
             ])
             ->recordUrl(fn (Horse $record): string => static::getUrl('view', ['record' => $record]));
     }

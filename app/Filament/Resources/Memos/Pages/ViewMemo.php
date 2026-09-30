@@ -40,7 +40,7 @@ class ViewMemo extends ViewRecord
                     $this->fillForm();
                 }),
             Action::make('rebuildHorseLog')
-                ->label('Rebuild horse log')
+                ->label('Rebuild farm log')
                 ->icon(Heroicon::OutlinedSparkles)
                 ->visible(fn (Memo $record): bool => filled($record->transcript))
                 ->action(function (): void {
@@ -53,11 +53,11 @@ class ViewMemo extends ViewRecord
                     $notification = Notification::make();
 
                     if ($memo->log_status === HorseLogStatus::Done) {
-                        $notification->title('Horse log saved')->success();
+                        $notification->title('Farm log saved')->success();
                     } elseif ($memo->log_status === HorseLogStatus::Skipped) {
-                        $notification->title('Horse log skipped')->body('The transcript is empty.')->warning();
+                        $notification->title('Farm log skipped')->body('The transcript is empty.')->warning();
                     } else {
-                        $notification->title('Horse log failed')->body($memo->log_error ?: 'Horse log failed.')->danger();
+                        $notification->title('Farm log failed')->body($memo->log_error ?: 'Farm log failed.')->danger();
                     }
 
                     $notification->send();

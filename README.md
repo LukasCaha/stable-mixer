@@ -97,7 +97,7 @@ An active stable returns `{ "name": "North Barn", "tenant_code": "A1B2C3D4" }`. 
 
 Uploads are rate-limited per tenant code (`MEMO_RATE_LIMIT`, default 30 per minute). Unknown and inactive codes are rejected and still count toward the limit for that code.
 
-Memos move through `queued` → `processing` → `done`, or `failed` with `error` set. `TranscribeMemo` implements `App\Contracts\Failable`; its `failed()` hook writes the error onto the memo. When the transcript is saved, the same request asks Groq’s cheapest text model (`openai/gpt-oss-20b` through the Laravel AI SDK) to update each mentioned horse. That step writes an event log and replaces that horse’s knowledge document. Its result is `log_status`: `done`, `skipped` when the transcript is empty, or `failed` with `log_error`. A failed horse log leaves the transcript in place.
+Memos move through `queued` → `processing` → `done`, or `failed` with `error` set. `TranscribeMemo` implements `App\Contracts\Failable`; its `failed()` hook writes the error onto the memo. When the transcript is saved, the same request asks Groq’s cheapest text model (`openai/gpt-oss-20b` through the Laravel AI SDK) to update each farm record the memo mentions. That step writes an event log and replaces that record’s knowledge document. Its result is `log_status`: `done`, `skipped` when the transcript is empty, or `failed` with `log_error`. A failed farm log leaves the transcript in place.
 
 Raise `upload_max_filesize` and `post_max_size` in PHP if you accept longer recordings than the default 2 MB.
 
@@ -112,8 +112,8 @@ The dashboard shows the pairing code and its QR. Share that with the phone. Owne
 Login is scoped to the user’s single stable. The panel URL is `/admin/{tenant_code}`.
 
 - **Dashboard** — memos today, pending transcription, failed, and the latest memos
-- **Memos** — filter by status, open a memo to play or download the audio and read the transcript. **Rebuild horse log** runs the horse step again
-- **Horses** — knowledge document and event log for each horse, built from memos. One memo can add several events on several horses
+- **Memos** — filter by status, open a memo to play or download the audio and read the transcript. **Rebuild farm log** runs the farm step again
+- **Records** — knowledge document and event log for animals, vehicles, shared stock such as tools, and places. One memo can update several records. A shovel shares the Tools record instead of getting its own
 - **Stable mates** — list users in this stable. Owners invite mates with a name, email, role, and password (no invitation email in v0)
 - **Stable settings** (tenant menu) — edit the name and whether uploads are accepted. The tenant code is read-only after create. **Regenerate tenant code** asks for confirmation, then the old code stops working
 - **Stables** — super admins (`users.is_super_admin`) can list and edit every stable. Everyone else only sees their own team. Super admin does not make an account a member of other stables

@@ -6,8 +6,10 @@ use App\Contracts\SpeechTranscriber;
 use App\Enums\MemoStatus;
 use App\Jobs\TranscribeMemo;
 use App\Models\Memo;
+use App\Models\Stable;
 use App\Services\GroqTranscriber;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Ai\Prompts\TranscriptionPrompt;
 use Laravel\Ai\Transcription;
@@ -83,6 +85,27 @@ class TranscribeMemoTest extends TestCase
         $memo->refresh();
         $this->assertSame(MemoStatus::Failed, $memo->status);
         $this->assertSame('provider down', $memo->error);
+    }
+
+    public function test_upload_transcribes_after_the_response(): void
+    {
+        Storage::fake('memos');
+        Transcription::fake(['Turn out the mare.']);
+
+        $stable = Stable::factory()->create(['tenant_code' => 'A1B2C3D4']);
+
+        $this->post('/api/v1/memos', [
+            'file' => UploadedFile::fake()->create('note.m4a', 20, 'audio/mp4'),
+        ], [
+            'X-Tenant' => 'A1B2C3D4',
+            'Accept' => 'application/json',
+        ])->assertCreated()
+            ->assertJson(['status' => 'queued']);
+
+        $memo = Memo::query()->firstOrFail();
+        $this->assertSame($stable->id, $memo->stable_id);
+        $this->assertSame(MemoStatus::Done, $memo->status);
+        $this->assertSame('Turn out the mare.', $memo->transcript);
     }
 
     public function test_missing_key_explains_that_this_process_loaded_an_empty_value(): void

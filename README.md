@@ -45,7 +45,7 @@ Run the dev server, queue worker, and Vite together:
 composer dev
 ```
 
-`QUEUE_CONNECTION=database` is the default. Uploads stay `queued` until a worker runs `TranscribeMemo`.
+`QUEUE_CONNECTION=database` is the default. The upload response is `queued`, then transcription runs in that same request after the phone has its answer. A queue worker is not required for a new memo.
 
 Set the Groq key in `.env`. The same `gsk_` key you already have is the one Laravel AI SDK 1.0 uses. The model is `whisper-large-v3-turbo`.
 

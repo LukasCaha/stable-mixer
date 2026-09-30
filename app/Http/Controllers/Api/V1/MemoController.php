@@ -31,7 +31,7 @@ class MemoController extends Controller
             'recorded_at' => $request->date('recorded_at'),
         ]);
 
-        TranscribeMemo::dispatch($memo);
+        TranscribeMemo::dispatch($memo)->afterResponse();
 
         return response()->json([
             'id' => $memo->id,

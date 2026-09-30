@@ -24,8 +24,10 @@ Read the transcript and return every horse it mentions.
 Use a horse's existing name from the roster when it is the same animal, ignoring case and aliases.
 Create a horse only when the transcript names an animal that is not on the roster.
 One transcript may mention many horses and many events.
-Every event must come from this transcript.
-Rewrite each mentioned horse's knowledge document so it stays a concise markdown brief of what is known, including the previous document and these new events.
+Every new event must come from this transcript.
+The knowledge document is what is true now. Keep earlier facts this transcript does not change.
+If this transcript corrects a past memo, drop the wrong fact from the knowledge document and put those earlier event ids in retract_event_ids.
+Do not retract an event this transcript does not contradict.
 Leave out horses the transcript does not mention.
 If the transcript mentions no horse, return an empty horses array.
 TEXT;
@@ -42,6 +44,7 @@ TEXT;
                     'name' => $schema->string()->required(),
                     'aliases' => $schema->array()->items($schema->string())->required(),
                     'knowledge' => $schema->string()->required(),
+                    'retract_event_ids' => $schema->array()->items($schema->integer())->required(),
                     'events' => $schema->array()->items(
                         $schema->object([
                             'occurred_on' => $schema->string()->nullable()->required(),

@@ -48,6 +48,12 @@ class HorseResource extends Resource
                     ->columnSpanFull()
                     ->components([
                         TextEntry::make('occurred_on')->date()->placeholder('—')->label('When'),
+                        TextEntry::make('retracted_at')
+                            ->label('Status')
+                            ->badge()
+                            ->color('warning')
+                            ->formatStateUsing(fn (): string => 'Corrected')
+                            ->visible(fn (HorseEvent $record): bool => $record->retracted_at !== null),
                         TextEntry::make('summary'),
                         TextEntry::make('detail')->placeholder('—')->columnSpanFull(),
                         TextEntry::make('memo_id')

@@ -76,6 +76,12 @@ class MemoResource extends Resource
                             ->label('Horse')
                             ->url(fn (HorseEvent $record): string => HorseResource::getUrl('view', ['record' => $record->horse_id])),
                         TextEntry::make('occurred_on')->date()->placeholder('—')->label('When'),
+                        TextEntry::make('retracted_at')
+                            ->label('Status')
+                            ->badge()
+                            ->color('warning')
+                            ->formatStateUsing(fn (): string => 'Corrected')
+                            ->visible(fn (HorseEvent $record): bool => $record->retracted_at !== null),
                         TextEntry::make('summary')->columnSpanFull(),
                         TextEntry::make('detail')->placeholder('—')->columnSpanFull(),
                     ]),

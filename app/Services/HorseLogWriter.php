@@ -42,7 +42,11 @@ class HorseLogWriter
             return;
         }
 
-        $memo->load('stable.horses');
+        $memo->load([
+            'stable.horses.events' => function ($query): void {
+                $query->whereNull('retracted_at');
+            },
+        ]);
         $memo->update([
             'log_status' => HorseLogStatus::Pending,
             'log_error' => null,
@@ -66,6 +70,10 @@ class HorseLogWriter
         $entries = $this->normalize($horses);
 
         DB::transaction(function () use ($memo, $entries): void {
+            HorseEvent::query()->where('retracted_by_memo_id', $memo->id)->update([
+                'retracted_at' => null,
+                'retracted_by_memo_id' => null,
+            ]);
             HorseEvent::query()->where('memo_id', $memo->id)->delete();
 
             foreach ($entries as $entry) {
@@ -79,6 +87,8 @@ class HorseLogWriter
                         'detail' => $event['detail'],
                     ]);
                 }
+
+                $this->retract($memo, $horse, $entry['retract_event_ids']);
             }
 
             $memo->update([
@@ -94,8 +104,20 @@ class HorseLogWriter
             ->map(function (Horse $horse): string {
                 $aliases = $horse->aliases === [] ? 'none' : implode(', ', $horse->aliases);
                 $knowledge = trim($horse->knowledge) === '' ? 'none' : $horse->knowledge;
+                $events = $horse->events
+                    ->map(function (HorseEvent $event): string {
+                        $when = $event->occurred_on?->toDateString() ?? 'undated';
+                        $detail = trim($event->detail) === '' ? '—' : $event->detail;
 
-                return "- {$horse->name} (aliases: {$aliases})\n  Knowledge:\n{$knowledge}";
+                        return "  - {$event->id} | {$when} | {$event->summary} | {$detail}";
+                    })
+                    ->implode("\n");
+
+                if ($events === '') {
+                    $events = '  none';
+                }
+
+                return "- {$horse->name} (aliases: {$aliases})\n  Knowledge:\n{$knowledge}\n  Events:\n{$events}";
             })
             ->implode("\n");
 
@@ -118,7 +140,7 @@ TEXT;
 
     /**
      * @param  list<mixed>  $horses
-     * @return list<array{name: string, name_key: string, aliases: list<string>, knowledge: string, events: list<array{occurred_on: ?string, summary: string, detail: string}>}>
+     * @return list<array{name: string, name_key: string, aliases: list<string>, knowledge: string, retract_event_ids: list<int>, events: list<array{occurred_on: ?string, summary: string, detail: string}>}>
      */
     private function normalize(array $horses): array
     {
@@ -144,6 +166,7 @@ TEXT;
                     'name_key' => $key,
                     'aliases' => [],
                     'knowledge' => '',
+                    'retract_event_ids' => [],
                     'events' => [],
                 ];
             }
@@ -153,6 +176,10 @@ TEXT;
                 $this->stringList($horse['aliases'] ?? []),
             );
             $grouped[$key]['knowledge'] = is_string($horse['knowledge'] ?? null) ? $horse['knowledge'] : '';
+            $grouped[$key]['retract_event_ids'] = array_values(array_unique([
+                ...$grouped[$key]['retract_event_ids'],
+                ...$this->eventIds($horse['retract_event_ids'] ?? []),
+            ]));
 
             foreach ($this->events($horse['events'] ?? []) as $event) {
                 $grouped[$key]['events'][] = $event;
@@ -163,7 +190,7 @@ TEXT;
     }
 
     /**
-     * @param  array{name: string, name_key: string, aliases: list<string>, knowledge: string, events: list<array{occurred_on: ?string, summary: string, detail: string}>}  $entry
+     * @param  array{name: string, name_key: string, aliases: list<string>, knowledge: string, retract_event_ids: list<int>, events: list<array{occurred_on: ?string, summary: string, detail: string}>}  $entry
      */
     private function upsertHorse(Memo $memo, array $entry): Horse
     {
@@ -184,6 +211,25 @@ TEXT;
         $horse->save();
 
         return $horse;
+    }
+
+    /**
+     * @param  list<int>  $ids
+     */
+    private function retract(Memo $memo, Horse $horse, array $ids): void
+    {
+        if ($ids === []) {
+            return;
+        }
+
+        HorseEvent::query()
+            ->where('horse_id', $horse->id)
+            ->whereIn('id', $ids)
+            ->where('memo_id', '!=', $memo->id)
+            ->update([
+                'retracted_at' => now(),
+                'retracted_by_memo_id' => $memo->id,
+            ]);
     }
 
     /**
@@ -211,6 +257,28 @@ TEXT;
         }
 
         return array_values($merged);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function eventIds(mixed $ids): array
+    {
+        if (! is_array($ids)) {
+            return [];
+        }
+
+        $parsed = [];
+
+        foreach ($ids as $id) {
+            if (is_int($id) && $id > 0) {
+                $parsed[] = $id;
+            } elseif (is_string($id) && ctype_digit($id) && (int) $id > 0) {
+                $parsed[] = (int) $id;
+            }
+        }
+
+        return $parsed;
     }
 
     /**

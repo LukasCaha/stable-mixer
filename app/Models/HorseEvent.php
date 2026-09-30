@@ -16,6 +16,8 @@ class HorseEvent extends Model
         'occurred_on',
         'summary',
         'detail',
+        'retracted_at',
+        'retracted_by_memo_id',
     ];
 
     /**
@@ -25,6 +27,7 @@ class HorseEvent extends Model
     {
         return [
             'occurred_on' => 'date',
+            'retracted_at' => 'datetime',
         ];
     }
 
@@ -36,5 +39,10 @@ class HorseEvent extends Model
     public function memo(): BelongsTo
     {
         return $this->belongsTo(Memo::class);
+    }
+
+    public function retractedBy(): BelongsTo
+    {
+        return $this->belongsTo(Memo::class, 'retracted_by_memo_id');
     }
 }

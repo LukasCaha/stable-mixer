@@ -281,4 +281,88 @@ class HorseLogTest extends TestCase
         $this->assertSame(1, $horse->events()->count());
         $this->assertSame('Turned out after lunch', $horse->events()->first()->summary);
     }
+
+    public function test_a_later_memo_corrects_an_earlier_event(): void
+    {
+        $stable = Stable::factory()->create(['tenant_code' => 'A1B2C3D4']);
+        $owner = User::factory()->for($stable)->owner()->create();
+        $oak = Horse::factory()->for($stable)->create([
+            'name' => 'Oak',
+            'knowledge' => 'Oak is lame in the left fore.',
+        ]);
+        $willow = Horse::factory()->for($stable)->create([
+            'name' => 'Willow',
+            'knowledge' => 'Willow is sound.',
+        ]);
+        $earlier = Memo::factory()->for($stable)->done()->create([
+            'transcript' => 'Oak is lame.',
+        ]);
+        $wrong = HorseEvent::query()->create([
+            'horse_id' => $oak->id,
+            'memo_id' => $earlier->id,
+            'occurred_on' => '2026-09-29',
+            'summary' => 'Noted lame',
+            'detail' => 'Left fore.',
+        ]);
+        $willowEvent = HorseEvent::query()->create([
+            'horse_id' => $willow->id,
+            'memo_id' => $earlier->id,
+            'occurred_on' => '2026-09-29',
+            'summary' => 'Sound',
+            'detail' => 'No heat.',
+        ]);
+        $correction = Memo::factory()->for($stable)->done()->create([
+            'transcript' => 'Oak is not lame. I was wrong yesterday.',
+        ]);
+
+        $payload = [[
+            'horses' => [
+                [
+                    'name' => 'Oak',
+                    'aliases' => [],
+                    'knowledge' => 'Oak is sound. The lameness note was a mistake.',
+                    'retract_event_ids' => [(string) $wrong->id, $willowEvent->id],
+                    'events' => [
+                        [
+                            'occurred_on' => '2026-09-30',
+                            'summary' => 'Not lame',
+                            'detail' => 'Corrects the earlier note.',
+                        ],
+                    ],
+                ],
+            ],
+        ]];
+
+        HorseLogAgent::fake($payload);
+        $writer = app(HorseLogWriter::class);
+        $writer->record($correction);
+
+        HorseLogAgent::assertPrompted(function (AgentPrompt $prompt) use ($wrong): bool {
+            return str_contains($prompt->prompt, (string) $wrong->id)
+                && str_contains($prompt->prompt, 'Noted lame')
+                && str_contains($prompt->prompt, 'Oak is not lame.');
+        });
+
+        HorseLogAgent::fake($payload);
+        $writer->record($correction->refresh());
+
+        $wrong->refresh();
+        $willowEvent->refresh();
+        $oak->refresh();
+
+        $this->assertNotNull($wrong->retracted_at);
+        $this->assertSame($correction->id, $wrong->retracted_by_memo_id);
+        $this->assertNull($willowEvent->retracted_at);
+        $this->assertSame('Oak is sound. The lameness note was a mistake.', $oak->knowledge);
+        $this->assertSame('Willow is sound.', $willow->knowledge);
+        $this->assertSame(1, $oak->events()->whereNull('retracted_at')->count());
+        $this->assertSame('Not lame', $oak->events()->whereNull('retracted_at')->first()->summary);
+
+        $this->actingAs($owner)
+            ->get('/admin/A1B2C3D4/horses/'.$oak->id)
+            ->assertOk()
+            ->assertSee('Oak is sound. The lameness note was a mistake.')
+            ->assertSee('Corrected')
+            ->assertSee('Not lame');
+    }
 }

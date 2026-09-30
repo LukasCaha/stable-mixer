@@ -1,0 +1,155 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\UserRole;
+use App\Filament\Resources\StableMates\Pages\CreateStableMate;
+use App\Models\Memo;
+use App\Models\Stable;
+use App\Models\User;
+use Filament\Facades\Filament;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+class AdminPanelTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_home_redirects_to_the_admin_panel(): void
+    {
+        $this->get('/')->assertRedirect('/admin');
+    }
+
+    public function test_login_screen_is_available(): void
+    {
+        $this->get('/admin/login')->assertOk();
+    }
+
+    public function test_owner_dashboard_is_scoped_to_their_stable(): void
+    {
+        $stable = Stable::factory()->create(['tenant_code' => 'A1B2C3D4', 'name' => 'Demo Stable']);
+        $other = Stable::factory()->create(['name' => 'Other Stable']);
+        $owner = User::factory()->for($stable)->owner()->create();
+
+        Memo::factory()->for($stable)->done()->create([
+            'transcript' => 'North paddock gate',
+        ]);
+        Memo::factory()->for($other)->done()->create([
+            'transcript' => 'SECRET OTHER STABLE',
+        ]);
+
+        $this->actingAs($owner)
+            ->get('/admin/A1B2C3D4')
+            ->assertOk()
+            ->assertSee('Memos today')
+            ->assertSee('North paddock gate')
+            ->assertDontSee('SECRET OTHER STABLE');
+
+        $this->actingAs($owner)
+            ->get('/admin/'.$other->tenant_code)
+            ->assertNotFound();
+    }
+
+    public function test_owner_can_open_stable_settings_and_a_member_cannot(): void
+    {
+        $stable = Stable::factory()->create(['tenant_code' => 'A1B2C3D4']);
+        $owner = User::factory()->for($stable)->owner()->create();
+        $member = User::factory()->for($stable)->create();
+
+        $this->actingAs($owner)->get('/admin/A1B2C3D4/profile')->assertOk();
+        $this->actingAs($member)->get('/admin/A1B2C3D4/profile')->assertNotFound();
+    }
+
+    public function test_super_admin_can_list_every_stable_and_a_member_cannot(): void
+    {
+        $stable = Stable::factory()->create(['tenant_code' => 'A1B2C3D4', 'name' => 'Demo Stable']);
+        Stable::factory()->create(['name' => 'Hill Barn']);
+        $super = User::factory()->for($stable)->superAdmin()->create();
+        $member = User::factory()->for($stable)->create();
+
+        $this->actingAs($super)
+            ->get('/admin/A1B2C3D4/stables')
+            ->assertOk()
+            ->assertSee('Demo Stable')
+            ->assertSee('Hill Barn');
+
+        $this->actingAs($member)
+            ->get('/admin/A1B2C3D4/stables')
+            ->assertForbidden();
+    }
+
+    public function test_owner_can_invite_a_stable_mate(): void
+    {
+        $stable = Stable::factory()->create(['tenant_code' => 'A1B2C3D4']);
+        $owner = User::factory()->for($stable)->owner()->create();
+
+        $this->actingAs($owner);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Filament::setTenant($stable);
+
+        Livewire::actingAs($owner)
+            ->test(CreateStableMate::class)
+            ->fillForm([
+                'name' => 'Sam Rider',
+                'email' => 'sam@stable.test',
+                'role' => UserRole::Member->value,
+                'password' => 'password',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'sam@stable.test',
+            'stable_id' => $stable->id,
+            'role' => UserRole::Member->value,
+        ]);
+    }
+
+    public function test_owner_can_open_a_memo_and_play_audio(): void
+    {
+        Storage::fake('memos');
+
+        $stable = Stable::factory()->create(['tenant_code' => 'A1B2C3D4']);
+        $owner = User::factory()->for($stable)->owner()->create();
+        $memo = Memo::factory()->for($stable)->done()->create([
+            'disk' => 'memos',
+            'disk_path' => 'stables/'.$stable->id.'/note.m4a',
+            'transcript' => 'North paddock gate',
+        ]);
+        Storage::disk('memos')->put($memo->disk_path, 'audio-bytes');
+
+        $this->actingAs($owner)
+            ->get('/admin/A1B2C3D4/memos/'.$memo->id)
+            ->assertOk()
+            ->assertSee('North paddock gate')
+            ->assertSee('<audio', false);
+    }
+
+    public function test_audio_route_is_limited_to_the_stable(): void
+    {
+        Storage::fake('memos');
+
+        $stable = Stable::factory()->create();
+        $other = Stable::factory()->create();
+        $owner = User::factory()->for($stable)->owner()->create();
+        $stranger = User::factory()->for($other)->owner()->create();
+        $memo = Memo::factory()->for($stable)->create([
+            'disk' => 'memos',
+            'disk_path' => 'stables/'.$stable->id.'/note.m4a',
+            'mime' => 'audio/mp4',
+        ]);
+        Storage::disk('memos')->put($memo->disk_path, 'audio-bytes');
+
+        $this->get(route('memos.audio', $memo))->assertRedirect('/admin/login');
+
+        $this->actingAs($stranger)
+            ->get(route('memos.audio', $memo))
+            ->assertForbidden();
+
+        $response = $this->actingAs($owner)->get(route('memos.audio', $memo));
+        $response->assertOk();
+        $this->assertStringContainsString('audio-bytes', $response->streamedContent());
+    }
+}

@@ -1,0 +1,90 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Contracts\SpeechTranscriber;
+use App\Enums\MemoStatus;
+use App\Jobs\TranscribeMemo;
+use App\Models\Memo;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use RuntimeException;
+use Tests\TestCase;
+
+class TranscribeMemoTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_job_stores_the_transcript(): void
+    {
+        Storage::fake('memos');
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://stt.test/v1/audio/transcriptions' => Http::response([
+                'text' => 'Turn out the mare.',
+            ]),
+        ]);
+
+        $memo = Memo::factory()->create([
+            'disk' => 'memos',
+            'disk_path' => 'stables/1/note.m4a',
+        ]);
+        Storage::disk('memos')->put($memo->disk_path, 'fake-audio');
+
+        $job = new TranscribeMemo($memo);
+        $job->handle(app(SpeechTranscriber::class));
+
+        $memo->refresh();
+        $this->assertSame(MemoStatus::Done, $memo->status);
+        $this->assertSame('Turn out the mare.', $memo->transcript);
+        $this->assertNull($memo->error);
+
+        Http::assertSent(function ($request): bool {
+            return $request->url() === 'https://stt.test/v1/audio/transcriptions'
+                && str_contains($request->body(), 'whisper-1');
+        });
+    }
+
+    public function test_failed_hook_marks_the_memo_failed(): void
+    {
+        $memo = Memo::factory()->create(['status' => MemoStatus::Processing]);
+
+        $job = new TranscribeMemo($memo);
+        $job->failed(new RuntimeException('provider down'));
+
+        $memo->refresh();
+        $this->assertSame(MemoStatus::Failed, $memo->status);
+        $this->assertSame('provider down', $memo->error);
+    }
+
+    public function test_sync_queue_failure_marks_the_memo_failed(): void
+    {
+        Storage::fake('memos');
+
+        $this->app->bind(SpeechTranscriber::class, fn () => new class implements SpeechTranscriber
+        {
+            public function transcribe(Memo $memo): string
+            {
+                throw new RuntimeException('provider down');
+            }
+        });
+
+        $memo = Memo::factory()->create([
+            'disk' => 'memos',
+            'disk_path' => 'stables/1/note.m4a',
+        ]);
+        Storage::disk('memos')->put($memo->disk_path, 'fake-audio');
+
+        try {
+            TranscribeMemo::dispatch($memo);
+            $this->fail('The sync queue should surface the transcription error.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('provider down', $exception->getMessage());
+        }
+
+        $memo->refresh();
+        $this->assertSame(MemoStatus::Failed, $memo->status);
+        $this->assertSame('provider down', $memo->error);
+    }
+}

@@ -1,0 +1,86 @@
+<?php
+
+namespace App\Filament\Resources\Memos;
+
+use App\Enums\MemoStatus;
+use App\Filament\Resources\Memos\Pages\ListMemos;
+use App\Filament\Resources\Memos\Pages\ViewMemo;
+use App\Models\Memo;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\HtmlString;
+use Illuminate\Support\Number;
+
+class MemoResource extends Resource
+{
+    protected static ?string $model = Memo::class;
+
+    protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedMicrophone;
+
+    protected static ?string $navigationLabel = 'Memos';
+
+    protected static ?int $navigationSort = 1;
+
+    protected static ?string $recordTitleAttribute = 'id';
+
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                TextEntry::make('status')->badge(),
+                TextEntry::make('created_at')->dateTime()->label('Uploaded'),
+                TextEntry::make('recorded_at')->dateTime()->placeholder('—'),
+                TextEntry::make('size')
+                    ->formatStateUsing(fn (int $state): string => Number::fileSize($state)),
+                TextEntry::make('mime'),
+                TextEntry::make('audio')
+                    ->label('Audio')
+                    ->state(fn (Memo $record): string => route('memos.audio', $record))
+                    ->formatStateUsing(fn (string $state): HtmlString => new HtmlString(
+                        '<audio controls preload="none" src="'.e($state).'" style="width:100%"></audio>'
+                    ))
+                    ->html()
+                    ->visible(fn (Memo $record): bool => filled($record->disk_path) && Storage::disk($record->disk)->exists($record->disk_path))
+                    ->columnSpanFull(),
+                TextEntry::make('transcript')
+                    ->placeholder('Not transcribed yet.')
+                    ->columnSpanFull(),
+                TextEntry::make('error')
+                    ->placeholder('—')
+                    ->visible(fn (Memo $record): bool => $record->status === MemoStatus::Failed)
+                    ->columnSpanFull(),
+            ]);
+    }
+
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->defaultSort('created_at', 'desc')
+            ->columns([
+                TextColumn::make('created_at')->dateTime()->label('Uploaded')->sortable(),
+                TextColumn::make('status')->badge()->sortable(),
+                TextColumn::make('size')
+                    ->formatStateUsing(fn (int $state): string => Number::fileSize($state)),
+                TextColumn::make('transcript')->limit(60)->placeholder('—')->searchable(),
+                TextColumn::make('recorded_at')->dateTime()->placeholder('—')->toggleable(),
+                TextColumn::make('error')->limit(40)->placeholder('—')->toggleable(isToggledHiddenByDefault: true),
+            ])
+            ->filters([
+                SelectFilter::make('status')->options(MemoStatus::class),
+            ]);
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => ListMemos::route('/'),
+            'view' => ViewMemo::route('/{record}'),
+        ];
+    }
+}

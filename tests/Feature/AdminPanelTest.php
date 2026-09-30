@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Ai\Agents\HorseLogAgent;
 use App\Enums\MemoStatus;
 use App\Enums\UserRole;
 use App\Filament\Auth\RegisterStable;
@@ -224,6 +225,7 @@ class AdminPanelTest extends TestCase
     {
         Storage::fake('memos');
         Transcription::fake(['Turn out the mare.']);
+        HorseLogAgent::fake([['horses' => []]]);
 
         $stable = Stable::factory()->create(['tenant_code' => 'A1B2C3D4']);
         $owner = User::factory()->for($stable)->owner()->create();

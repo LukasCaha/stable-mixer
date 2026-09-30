@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\HorseLogStatus;
 use App\Enums\MemoStatus;
 use Database\Factories\MemoFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Memo extends Model
 {
@@ -27,6 +29,8 @@ class Memo extends Model
         'status',
         'transcript',
         'error',
+        'log_status',
+        'log_error',
         'recorded_at',
     ];
 
@@ -38,6 +42,7 @@ class Memo extends Model
         return [
             'size' => 'integer',
             'status' => MemoStatus::class,
+            'log_status' => HorseLogStatus::class,
             'recorded_at' => 'datetime',
         ];
     }
@@ -45,6 +50,13 @@ class Memo extends Model
     public function stable(): BelongsTo
     {
         return $this->belongsTo(Stable::class);
+    }
+
+    public function horseEvents(): HasMany
+    {
+        return $this->hasMany(HorseEvent::class)
+            ->orderByDesc('occurred_on')
+            ->orderByDesc('id');
     }
 
     /**

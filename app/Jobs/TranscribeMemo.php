@@ -4,8 +4,10 @@ namespace App\Jobs;
 
 use App\Contracts\Failable;
 use App\Contracts\SpeechTranscriber;
+use App\Enums\HorseLogStatus;
 use App\Enums\MemoStatus;
 use App\Models\Memo;
+use App\Services\HorseLogWriter;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
@@ -39,6 +41,15 @@ class TranscribeMemo implements Failable, ShouldQueue
             'transcript' => $transcript,
             'error' => null,
         ]);
+
+        try {
+            app(HorseLogWriter::class)->record($this->memo->refresh());
+        } catch (Throwable $exception) {
+            $this->memo->update([
+                'log_status' => HorseLogStatus::Failed,
+                'log_error' => str($exception->getMessage() ?: 'Horse log failed.')->limit(2000)->toString(),
+            ]);
+        }
     }
 
     public function failed(?Throwable $exception): void

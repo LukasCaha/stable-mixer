@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Ai\Agents\HorseLogAgent;
 use App\Contracts\SpeechTranscriber;
+use App\Enums\HorseLogStatus;
 use App\Enums\MemoStatus;
 use App\Jobs\TranscribeMemo;
 use App\Models\Memo;
@@ -24,6 +26,7 @@ class TranscribeMemoTest extends TestCase
     {
         Storage::fake('memos');
         Transcription::fake(['Turn out the mare.']);
+        HorseLogAgent::fake([['horses' => []]]);
 
         $memo = Memo::factory()->create([
             'disk' => 'memos',
@@ -38,6 +41,7 @@ class TranscribeMemoTest extends TestCase
         $this->assertSame(MemoStatus::Done, $memo->status);
         $this->assertSame('Turn out the mare.', $memo->transcript);
         $this->assertNull($memo->error);
+        $this->assertSame(HorseLogStatus::Done, $memo->log_status);
 
         Transcription::assertGenerated(function (TranscriptionPrompt $prompt): bool {
             return $prompt->provider->driver() === 'groq'
@@ -91,6 +95,7 @@ class TranscribeMemoTest extends TestCase
     {
         Storage::fake('memos');
         Transcription::fake(['Turn out the mare.']);
+        HorseLogAgent::fake([['horses' => []]]);
 
         $stable = Stable::factory()->create(['tenant_code' => 'A1B2C3D4']);
 

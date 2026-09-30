@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\HorseLogStatus;
 use App\Enums\MemoStatus;
 use App\Models\Memo;
 use App\Models\Stable;
@@ -28,6 +29,8 @@ class MemoFactory extends Factory
             'status' => MemoStatus::Queued,
             'transcript' => null,
             'error' => null,
+            'log_status' => HorseLogStatus::Pending,
+            'log_error' => null,
             'recorded_at' => null,
         ];
     }
